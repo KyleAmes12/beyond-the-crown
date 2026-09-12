@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#111318">
+<title>Beyond the Crown</title>
+<style>
+:root{--bg:#0c0d11;--card:#171920;--ink:#f1eee6;--muted:#aaa9b1;--gold:#d9ad55;--red:#d86464;--green:#72bf87}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,serif}
+main{max-width:720px;margin:auto;padding:24px 16px 70px}.card{background:var(--card);border:1px solid #30333d;border-radius:16px;padding:18px;margin:12px 0}
+h1{letter-spacing:.08em;font-size:28px}h2{font-size:20px}.gold{color:var(--gold)}.muted{color:var(--muted)}
+button{width:100%;margin:6px 0;padding:14px;border:1px solid #464a57;border-radius:12px;background:#22252e;color:var(--ink);font-size:16px;font-weight:700}
+button:active{transform:scale(.99)}.danger{border-color:#713d3d}.shop{border-color:#725e35}
+.bar{height:10px;background:#333641;border-radius:10px;overflow:hidden}.fill{height:100%;background:var(--red)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:system-ui,sans-serif;font-size:14px}
+#log{max-height:260px;overflow:auto;line-height:1.45}small{font-family:system-ui,sans-serif}
+</style></head>
+<body><main>
+<h1>BEYOND THE CROWN</h1>
+<div id="app"></div>
+</main>
+<script>
+const base={level:1,xp:0,maxHp:100,hp:100,attack:14,defense:5,crit:.08,critDmg:1.75,dodge:.06,gold:80,potions:2,
+capacity:5,equipped:[],inventory:[]};
+let p=JSON.parse(localStorage.getItem("btc-save")||"null")||structuredClone(base), enemy=null, log=[];
+const items=[
+ {id:"fang",name:"Predator Fang",price:90,cost:2,desc:"+8% critical chance.",apply:x=>x.crit+=.08},
+ {id:"guard",name:"Ironheart Charm",price:110,cost:2,desc:"+4 Defense.",apply:x=>x.defense+=4},
+ {id:"shade",name:"Shade Thread",price:140,cost:3,desc:"+10% dodge chance.",apply:x=>x.dodge+=.10},
+ {id:"blood",name:"Bloodglass Ring",price:190,cost:3,desc:"Critical hits heal 20% of damage.",vamp:true},
+ {id:"coin",name:"Merchant's Eye",price:125,cost:2,desc:"+35% gold from victories.",gold:true}
+];
+const enemies=[
+ {name:"Grave Rat",hp:45,atk:9,def:2,crit:.04,critD:1.5,dodge:.04,gold:[12,25],xp:20,moves:[["Bite",55,1],["Claw",30,.8],["Frenzy",15,1.5]]},
+ {name:"Ash Bandit",hp:80,atk:14,def:5,crit:.08,critD:1.6,dodge:.08,gold:[25,45],xp:35,moves:[["Slash",40,1],["Quick Stab",25,.8],["Heavy Cut",20,1.4],["Pocket Sand",15,.65]]},
+ {name:"Crown Warden",hp:150,atk:19,def:8,crit:.10,critD:1.8,dodge:.07,gold:[60,100],xp:70,moves:[["Royal Strike",24,1],["Shield Bash",18,.85],["Execution Arc",10,1.8],["Feint",16,.7],["Twin Cut",14,1.25],["Judgment",5,2.25],["Guarded Thrust",13,.9]]}
+];
+function stats(){
+ let s={...p}; for(const id of p.equipped){let i=items.find(z=>z.id===id); if(i?.apply)i.apply(s)} return s
+}
+function save(){localStorage.setItem("btc-save",JSON.stringify(p))}
+function header(){
+ let s=stats(), pct=Math.max(0,p.hp/p.maxHp*100);
+ return `<div class=card><div class=stats><b>LV ${p.level}</b><span>XP ${p.xp}</span><span>⚔️ ${s.attack} ATK</span><span>🛡️ ${s.defense} DEF</span><span>💥 ${Math.round(s.crit*100)}% CRIT</span><span>💨 ${Math.round(s.dodge*100)}% DODGE</span><span>🪙 ${p.gold} Gold</span><span>🧪 ${p.potions} Potions</span></div><p>❤️ ${p.hp}/${p.maxHp}</p><div class=bar><div class=fill style="width:${pct}%"></div></div></div>`
+}
+function home(){
+ enemy=null;log=[]; document.getElementById("app").innerHTML=header()+`<div class=card><h2>The Road Beyond</h2>
+ <p>The kingdom says the Crown Warden is the greatest monster still alive.</p><p class=muted>You have a feeling the kingdom is wrong.</p>
+ <button onclick="explore()">⚔️ Explore</button><button class=shop onclick="shop()">🛒 Night Market</button>
+ <button onclick="gear()">🎒 Abilities & Inventory</button><button onclick="rest()">🔥 Rest (20 Gold)</button>
+ <button onclick="save();alert('Game saved on this device.')">💾 Save</button></div>`
+}
+function explore(){ let pool=p.level<2?enemies.slice(0,2):enemies; start(pool[Math.floor(Math.random()*pool.length)])}
+function start(e){enemy=structuredClone(e);enemy.maxHp=enemy.hp;log=[`A ${enemy.name} approaches.`];battle()}
+function battle(){
+ let ep=Math.max(0,enemy.hp/enemy.maxHp*100);
+ document.getElementById("app").innerHTML=header()+`<div class=card><h2>⚔️ ${enemy.name}</h2><p>❤️ ${enemy.hp}/${enemy.maxHp}</p><div class=bar><div class=fill style="width:${ep}%"></div></div>
+ <div id=log>${log.slice(-7).map(x=>`<p>${x}</p>`).join("")}</div>
+ <button onclick="attack()">Attack</button><button onclick="power()">Power Strike</button><button onclick="potion()">Use Potion</button><button onclick="defend()">Defend</button><button onclick="run()">Run</button></div>`
+}
+function damage(atk,def,m=1){return Math.max(1,Math.round(atk*m-def*.55+Math.random()*4))}
+function attack(mult=1,name="Attack"){
+ let s=stats(); if(Math.random()<enemy.dodge){log.push(`${enemy.name} dodged your ${name}.`);return enemyTurn()}
+ let d=damage(s.attack,enemy.def,mult),crit=Math.random()<s.crit;if(crit)d=Math.round(d*s.critDmg);
+ enemy.hp=Math.max(0,enemy.hp-d);log.push(`${crit?"💥 CRITICAL! ":""}You use ${name} for ${d} damage.`);
+ if(crit&&p.equipped.includes("blood")){let h=Math.max(1,Math.round(d*.2));p.hp=Math.min(p.maxHp,p.hp+h);log.push(`Bloodglass restores ${h} HP.`)}
+ if(enemy.hp<=0)return win(); enemyTurn()
+}
+function power(){Math.random()<.22?(log.push("Your Power Strike misses!"),enemyTurn()):attack(1.65,"Power Strike")}
+function chooseMove(){
+ let r=Math.random()*100,a=0;for(const m of enemy.moves){a+=m[1];if(r<=a)return m}return enemy.moves[0]
+}
+function enemyTurn(defending=false){
+ let s=stats(),m=chooseMove(); if(Math.random()<s.dodge){log.push(`💨 You dodge ${enemy.name}'s ${m[0]}!`);return battle()}
+ let d=damage(enemy.atk,s.defense,m[2]);if(defending)d=Math.ceil(d*.5);let c=Math.random()<enemy.crit;if(c)d=Math.round(d*enemy.critD);
+ p.hp=Math.max(0,p.hp-d);log.push(`${enemy.name} uses ${m[0]}. ${c?"💥 CRITICAL! ":""}You take ${d} damage.`);
+ save();if(p.hp<=0)return lose();battle()
+}
+function defend(){log.push("You brace for the next attack.");enemyTurn(true)}
+function potion(){if(!p.potions){log.push("You have no potions.");return battle()}p.potions--;let h=Math.min(40,p.maxHp-p.hp);p.hp+=h;log.push(`You restore ${h} HP.`);enemyTurn()}
+function run(){if(Math.random()<.65){save();home()}else{log.push("You fail to escape.");enemyTurn()}}
+function win(){
+ let g=Math.floor(enemy.gold[0]+Math.random()*(enemy.gold[1]-enemy.gold[0]+1));if(p.equipped.includes("coin"))g=Math.round(g*1.35);
+ p.gold+=g;p.xp+=enemy.xp;log.push(`🏆 Victory! +${g} Gold, +${enemy.xp} XP.`);
+ while(p.xp>=p.level*100){p.xp-=p.level*100;p.level++;p.maxHp+=15;p.attack+=3;p.defense+=1;p.capacity++;p.hp=p.maxHp;log.push(`⭐ Level up! You are level ${p.level}.`)}
+ save();document.getElementById("app").innerHTML=header()+`<div class=card>${log.slice(-5).map(x=>`<p>${x}</p>`).join("")}<button onclick=home()>Continue</button></div>`
+}
+function lose(){p.hp=p.maxHp;p.gold=Math.max(0,p.gold-20);save();document.getElementById("app").innerHTML=`<div class=card><h2>YOU FALL.</h2><p>Something drags you back from the dark.</p><p>You lose 20 Gold.</p><button onclick=home()>Wake Up</button></div>`}
+function shop(){
+ let owned=id=>p.inventory.includes(id);document.getElementById("app").innerHTML=header()+`<div class=card><h2>🛒 Night Market</h2><p class=muted>"Power always has a price."</p>
+ ${items.map(i=>`<div class=card><b class=gold>${i.name}</b><p>${i.desc}</p><small>${i.cost} Capacity • ${i.price} Gold</small>${owned(i.id)?"<p>✓ Owned</p>":`<button onclick="buy('${i.id}')">Buy</button>`}</div>`).join("")}
+ <div class=card><b>Healing Potion — 25 Gold</b><button onclick=buyPotion()>Buy Potion</button></div><button onclick=home()>Back</button></div>`
+}
+function buy(id){let i=items.find(x=>x.id===id);if(p.gold<i.price)return alert("Not enough gold.");p.gold-=i.price;p.inventory.push(id);save();shop()}
+function buyPotion(){if(p.gold<25)return alert("Not enough gold.");p.gold-=25;p.potions++;save();shop()}
+function gear(){
+ let used=p.equipped.reduce((n,id)=>n+(items.find(x=>x.id===id)?.cost||0),0);
+ document.getElementById("app").innerHTML=header()+`<div class=card><h2>🎒 Ability Loadout</h2><p>Capacity: ${used}/${p.capacity}</p>
+ ${p.inventory.length?p.inventory.map(id=>{let i=items.find(x=>x.id===id),on=p.equipped.includes(id);return `<div class=card><b>${i.name}</b><p>${i.desc}</p><button onclick="toggle('${id}')">${on?"Unequip":"Equip"} (${i.cost})</button></div>`}).join(""):"<p>You don't own any ability items yet.</p>"}
+ <button onclick=home()>Back</button></div>`
+}
+function toggle(id){let i=items.find(x=>x.id===id),used=p.equipped.reduce((n,z)=>n+(items.find(x=>x.id===z)?.cost||0),0);
+ if(p.equipped.includes(id))p.equipped=p.equipped.filter(x=>x!==id);else{if(used+i.cost>p.capacity)return alert("Not enough Ability Capacity.");p.equipped.push(id)}save();gear()}
+function rest(){if(p.gold<20)return alert("Not enough gold.");p.gold-=20;p.hp=p.maxHp;save();home()}
+home();
+</script></body></html>
